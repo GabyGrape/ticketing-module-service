@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 // @RestController: Menandai class ini sebagai Controller yang otomatis mengembalikan data berformat JSON (bukan HTML)
 @RestController
+@CrossOrigin(origins = "http://localhost:5173")
 // @RequestMapping: Base URL path untuk seluruh endpoint di class ini
 @RequestMapping("/api/v1/tickets")
 public class TicketController {
