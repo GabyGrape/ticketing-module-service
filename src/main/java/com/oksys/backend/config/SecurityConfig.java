@@ -18,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -32,12 +33,18 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults()) // 👈 1. Aktifkan integrasi CORS
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 👈 2. Izinkan request OPTIONS (Pre-flight)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
+                                "/",
+                                "/error",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/webjars/**",
                                 "/api/auth/**",
                                 "/login",
                                 "/register",
@@ -47,21 +54,23 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
+                // 1. Eksekusi CorsFilter DULUAN agar request pre-flight (OPTIONS) dari browser tidak ditahan JWT
+                .addFilterBefore(new CorsFilter(corsConfigurationSource()), UsernamePasswordAuthenticationFilter.class)
+                // 2. Jalankan JwtAuthFilter setelah CorsFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 👈 3. Definisikan Bean CorsConfigurationSource untuk Vercel
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Izinkan domain Vercel dan Localhost untuk testing
-        configuration.setAllowedOrigins(List.of(
+        // FIX: Gunakan setAllowedOriginPatterns agar wildcard (misal https://*.vercel.app) tidak bikin error
+        configuration.setAllowedOriginPatterns(List.of(
                 "https://ticketing-management-web.vercel.app",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
+                "http://localhost:*",
+                "http://127.0.0.1:*",
                 "https://*.vercel.app"
         ));
 
