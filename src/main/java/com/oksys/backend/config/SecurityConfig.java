@@ -18,7 +18,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -33,6 +32,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // Cukup gunakan .cors(Customizer.withDefaults()) agar Spring menggunakan bean corsConfigurationSource()
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -54,9 +54,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                // 1. Eksekusi CorsFilter DULUAN agar request pre-flight (OPTIONS) dari browser tidak ditahan JWT
-                .addFilterBefore(new CorsFilter(corsConfigurationSource()), UsernamePasswordAuthenticationFilter.class)
-                // 2. Jalankan JwtAuthFilter setelah CorsFilter
+                // Filter JWT dijalankan setelah filter CORS bawaan Spring Security
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -66,17 +64,21 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // FIX: Gunakan setAllowedOriginPatterns agar wildcard (misal https://*.vercel.app) tidak bikin error
+        // Masukkan domain persis frontend kamu di sini
         configuration.setAllowedOriginPatterns(List.of(
+                "https://stadium.oktagabriel.my.id",
+                "https://*.oktagabriel.my.id",
                 "https://ticketing-management-web.vercel.app",
+                "https://*.vercel.app",
                 "http://localhost:*",
-                "http://127.0.0.1:*",
-                "https://*.vercel.app"
+                "http://127.0.0.1:*"
         ));
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L); // Cache pre-flight request selama 1 jam
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
