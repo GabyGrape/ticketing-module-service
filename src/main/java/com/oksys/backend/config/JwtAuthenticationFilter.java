@@ -24,7 +24,12 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
-    // UserDetailsService dihapus dari sini karena service ini stateless (tidak pakai DB Auth)
+
+    // Tambahkan method ini agar HTTP OPTIONS langsung diloloskan tanpa cek JWT
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        return "OPTIONS".equalsIgnoreCase(request.getMethod());
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -33,11 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = parseJwt(request);
 
         if (token != null && jwtUtils.validateToken(token)) {
-            // 1. Ambil claims langsung dari token menggunakan jwtUtils
-            Claims claims = jwtUtils.getClaimsFromToken(token); // sesuaikan nama method di JwtUtils kamu
+            Claims claims = jwtUtils.getClaimsFromToken(token);
             String username = claims.getSubject();
 
-            // 2. Ambil roles (dengan penanganan null-safety agar tidak NullPointerException)
             List<?> rawRoles = claims.get("roles", List.class);
             List<SimpleGrantedAuthority> authorities = Collections.emptyList();
 
@@ -48,14 +51,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .toList();
             }
 
-            // 3. Buat objek otentikasi
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(username, null, authorities);
 
-            // 4. Tambahkan rincian request (IP Address, Session ID, dll)
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-            // 5. Simpan ke SecurityContext
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
